@@ -1,10 +1,13 @@
-from fastapi import APIRouter, FastAPI, HTTPException, Request, Depends, Header, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends
 from typing import Literal
 
-from webcur.models.currency_rate_resp import CurrencyRaterResponce
+from webcur.models.currency_rate_resp import (
+    CurrencyRateResponce,
+    CurrencyRateListResponce
+)
+from webcur.service.exhachanger import ExchangeRatesService
+from webcur.service.injectors import main_service_injector
 
-from webcur.config import CONFIG
 
 router = APIRouter(
     prefix='/exchange',
@@ -14,27 +17,30 @@ router = APIRouter(
 
 @router.get(
     '/',
-    response_model=CurrencyRaterResponce
+    response_model=CurrencyRateResponce
 )
 async def get_exchange_rates(
     pair_name: Literal['BTC-USDT', 'ETH-USDT', 'XRP-USDT'],
-    # exchange_api_service:
+    service: ExchangeRatesService = Depends(main_service_injector),
 ):
     """
     Returns the stored exchange rate for the given pair
 
     Args:
-        pair_name (Literal['BTC-USDT', 'ETH-USDT', 'XRP-USDT']): 
+        pair_name (Literal['BTC-USDT', 'ETH-USDT', 'XRP-USDT']):
         The pair to get the exchange rate for
     """
-    return RedirectResponse(url=CONFIG['exchange_api_url'])
+    return await service.return_rate(pair_name)
 
 
-# @router.get('/')
-# async def get_exchange_rates_list(
-#     request:
-# ):
-#     """
-#     Redirects to the exchange rate API
-#     """
-#     return RedirectResponse(url=CONFIG['exchange_api_url'])
+@router.get(
+    '/courses',
+    response_model=CurrencyRateListResponce
+)
+async def get_exchange_rates_list(
+    service: ExchangeRatesService = Depends(main_service_injector),
+):
+    """
+    Redirects to the exchange rate API
+    """
+    return await service.return_rates_list()

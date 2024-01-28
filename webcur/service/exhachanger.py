@@ -1,7 +1,6 @@
 from webcur.database.repository import DataBaseRepository
-from webcur.service.external_api.baseapi import BaseAPI
 from functools import lru_cache
-from typing import Iterable
+import multiprocessing
 
 
 class ExchangeRatesService():
@@ -18,36 +17,40 @@ class ExchangeRatesService():
 
     def __init__(
         self,
-        repository: DataBaseRepository,
-        api: Iterable[BaseAPI],
+        data_queue: multiprocessing.Queue,
+        repository: DataBaseRepository | None = None,
     ):
+        self.data_queue = data_queue
         self.repository = repository
-        self.api_list = api
 
     @lru_cache
     async def return_rates_list(self) -> dict:
         """
-        Returns rates for the given pair
-
+        Returns all rates in the database
         """
-        return self.repository.read()
+        data = self._peek()
+        return {'data': data}
 
     @lru_cache
-    async def return_rates(self, pair_name) -> dict:
+    async def return_rate(self, pair_name) -> dict:
         """
         Returns rates for the given pair
 
         Args:
             pair_name (str): The pair to get the exchange rate for
         """
-        return self.repository.read(pair_name)
+        data = self._peek()
+        return data[pair_name]
 
-    async def fetch_data(self) -> None:
+    def _peek(self):
         """
-        Fetches the data from API and saves it database
+        Peeks at the front element of the multiprocessing.Queue
+        without removing it.
         """
-        for api in self.api_list:
-            rates = api.get_exchange_rates()
-            if rates is not None:
-                break
-        self.repository.write(rates)
+        try:
+            front_element = self.data_queue.get_nowait()
+            self.data_queue.put_nowait(front_element)
+            return front_element
+        except Exception:
+            # TODO: Add different exceptions
+            return None

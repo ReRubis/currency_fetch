@@ -1,29 +1,30 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from webcur.routes import route
-from webcur.service.exhachanger import ExchangeRatesService
-from webcur.service.external_api.BinanceIntegration import BinanceIntegration
 from webcur.service.external_api.OKXintegration import OKXIntegration
-from webcur.database.repository import DataBaseRepository
 import uvicorn
 from webcur.config import CONFIG
-import threading
+import multiprocessing
 import asyncio
+from webcur.service.injectors import data_queue_injector
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def background_process():
+def background_process(
+    data_queue: multiprocessing.Queue
+):
     """
     Background process that fetches the data from API and saves it database
     """
-    # repository = DataBaseRepository
-
     async def run():
         api = [
             # BinanceIntegration(),
-            OKXIntegration()
+            OKXIntegration(data_queue)
         ]
-        print("Starting background process")
         for api in api:
+            logger.info(f'Starting {api.__class__.__name__}')
             await api.run_websocket(
                 pair_name=CONFIG['CURRENCY_PAIRS']
             )
@@ -32,6 +33,9 @@ def background_process():
 
 
 def app_factory():
+    """
+    Builds the FastAPI app
+    """
     app = FastAPI()
 
     origins = [
@@ -50,9 +54,12 @@ def app_factory():
     return app
 
 
-app = app_factory()
-
-
 if __name__ == '__main__':
-    threading.Thread(target=background_process).start()
+    data_queue = data_queue_injector()
+    app = app_factory()
+
+    multiprocessing.Process(
+        target=background_process,
+        args=(data_queue,)
+    ).start()
     uvicorn.run(app, host="0.0.0.0", port=8000)

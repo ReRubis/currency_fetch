@@ -13,26 +13,34 @@ from webcur.models.external_api.okx_request import (
 from webcur.models.external_api.okx_common import InstId
 from typing import Iterable
 from websockets import WebSocketClientProtocol
+from multiprocessing import Queue
 import logging
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# TODO: Add Pydantic model for the WS response
+# That will remove the hard-coded strings
+
 
 class OKXIntegration(BaseAPI):
     """
     Class that makes call to the OKX API to get the exchange rates
+
+    Args:
+        data_queue (Queue): The queue to store the data
     """
 
-    def __init__(self):
+    def __init__(self, data_queue: Queue):
         self.api_key = CONFIG['OKX_API_KEY']
         self.api_secret = CONFIG['OKX_SECRET']
         self.base_uri = CONFIG['OKX_BASE_PUBLIC_URL']
+        self.queue = data_queue
 
     async def run_websocket(
             self,
             pair_name: Iterable[str],
-    ):
+    ) -> None:
         """
         Method that runs the websocket
         """
@@ -47,7 +55,7 @@ class OKXIntegration(BaseAPI):
         self,
         pair_name: Iterable[str],
         websocket: WebSocketClientProtocol,
-    ) -> dict:
+    ) -> None:
         """
         Method that makes the call to the OKX API to get the exchange rates
         """
@@ -64,14 +72,13 @@ class OKXIntegration(BaseAPI):
             try:
                 response = await websocket.recv()
                 data = json.loads(response)
-
                 if data.get('event') == 'subscribe':
                     logger.info(f"Subscribed to {data['arg']['instId']}")
 
                 elif data.get('data'):
-                    print(data)
                     logger.info('Received Currency exchange rate' +
-                                f'for {data["data"][0]["instId"]}')
+                                f' for {data["data"][0]["instId"]}')
+                    await self._update_stored_values(data=data)
 
                 time.sleep(5)
 
@@ -79,9 +86,37 @@ class OKXIntegration(BaseAPI):
                 logger.info("Connection closed. Reconnecting...")
                 break
 
+    async def _update_stored_values(self, data: dict) -> None:
+        """
+        Method that updates the stored values
+        """
+
+        # Short from input_currency
+        # TODO: Change the variable name and remove strings
+        ic = data['data'][0]
+
+        if self.queue.empty():
+            data = {
+                'BTC-USDT':
+                ic['instId'] if ic['instId'] == 'BTC-USDT' else None,
+                'ETH-USDT':
+                ic['instId'] if ic['instId'] == 'BTC-USDT' else None,
+                'XRP-USDT':
+                ic['instId'] if ic['instId'] == 'BTC-USDT' else None,
+            }
+            logger.debug('Stored data is None. Adding stored data')
+            self.queue.put(data)
+
+        else:
+            stored_data = self.queue.get()
+            stored_data[ic['instId']] = ic
+            logger.debug('Updating the stored data')
+            self.queue.put(stored_data)
+
 
 if __name__ == '__main__':
-    service = OKXIntegration()
+    data_queue = Queue()
+    service = OKXIntegration(data_queue)
 
     async def test_ws():
         await service.run_websocket(
