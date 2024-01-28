@@ -1,0 +1,31 @@
+FROM python:3.12-alpine
+
+EXPOSE 8000
+
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /web_trade
+
+
+RUN apk add --no-cache build-base libffi-dev openssl-dev python3-dev
+# Add essential build tools and libraries
+# Add essential build tools and libraries
+
+
+
+# Install pdm
+RUN pip install pdm 
+RUN python --version
+COPY . /telegramanon
+RUN chmod +x /telegramanon/run.sh
+RUN pdm install || (echo "pdm install failed, displaying log:" && cat /tmp/pdm-install-resolve-*.log)
+# Install projecpdt dependencies
+
+# Clean up build dependencies to reduce image size
+
+
+
+
+ENV PATH="/.venv/bin:$PATH"
+
+CMD ["/web_trade/run.sh"]
