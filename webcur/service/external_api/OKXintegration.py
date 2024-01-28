@@ -37,6 +37,8 @@ class OKXIntegration(BaseAPI):
         self.base_uri = CONFIG['OKX_BASE_PUBLIC_URL']
         self.queue = data_queue
 
+        self._set_queue()
+
     async def run_websocket(
             self,
             pair_name: Iterable[str],
@@ -86,6 +88,19 @@ class OKXIntegration(BaseAPI):
                 logger.info("Connection closed. Reconnecting...")
                 break
 
+    def _set_queue(self) -> None:
+        """
+        Sets the initial state of the queue
+        """
+        if self.queue.empty():
+            data = {
+                'BTC-USDT': None,
+                'ETH-USDT': None,
+                'XRP-USDT': None,
+            }
+            logger.debug('Setting the initial state of the queue')
+            self.queue.put(data)
+
     async def _update_stored_values(self, data: dict) -> None:
         """
         Method that updates the stored values
@@ -95,23 +110,10 @@ class OKXIntegration(BaseAPI):
         # TODO: Change the variable name and remove strings
         ic = data['data'][0]
 
-        if self.queue.empty():
-            data = {
-                'BTC-USDT':
-                ic['instId'] if ic['instId'] == 'BTC-USDT' else None,
-                'ETH-USDT':
-                ic['instId'] if ic['instId'] == 'BTC-USDT' else None,
-                'XRP-USDT':
-                ic['instId'] if ic['instId'] == 'BTC-USDT' else None,
-            }
-            logger.debug('Stored data is None. Adding stored data')
-            self.queue.put(data)
-
-        else:
-            stored_data = self.queue.get()
-            stored_data[ic['instId']] = ic
-            logger.debug('Updating the stored data')
-            self.queue.put(stored_data)
+        stored_data = self.queue.get()
+        stored_data[ic['instId']] = ic
+        logger.debug('Updating the stored data')
+        self.queue.put(stored_data)
 
 
 if __name__ == '__main__':
