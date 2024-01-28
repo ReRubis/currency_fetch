@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class CurrencyRaterResp(BaseModel):
+class CurrencyRaterResponce(BaseModel):
     currency: str
     rate: float
     date: str

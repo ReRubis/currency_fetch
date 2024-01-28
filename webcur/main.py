@@ -1,9 +1,34 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from webcur.routes import route
+from webcur.service.exhachanger import ExchangeRatesService
+from webcur.service.external_api.BinanceIntegration import BinanceIntegration
+from webcur.service.external_api.OKXintegration import OKXIntegration
+from webcur.database.repository import DataBaseRepository
 import uvicorn
+from webcur.config import CONFIG
+import threading
+import asyncio
 
-import os
+
+def background_process():
+    """
+    Background process that fetches the data from API and saves it database
+    """
+    # repository = DataBaseRepository
+
+    async def run():
+        api = [
+            # BinanceIntegration(),
+            OKXIntegration()
+        ]
+        print("Starting background process")
+        for api in api:
+            await api.run_websocket(
+                pair_name=CONFIG['CURRENCY_PAIRS']
+            )
+
+    asyncio.run(run())
 
 
 def app_factory():
@@ -22,8 +47,6 @@ def app_factory():
     )
     app.include_router(route.router)
 
-    # os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-
     return app
 
 
@@ -31,4 +54,5 @@ app = app_factory()
 
 
 if __name__ == '__main__':
+    threading.Thread(target=background_process).start()
     uvicorn.run(app, host="0.0.0.0", port=8000)
