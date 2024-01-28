@@ -4,6 +4,6 @@
 
 source ./.venv/bin/activate
 env PATH="/web_trade/.venv/bin:$PATH"
-python -m web_trade.main
+python -m webcur.main
 echo 'startup'
 
