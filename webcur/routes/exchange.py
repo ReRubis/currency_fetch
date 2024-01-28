@@ -44,3 +44,15 @@ async def get_exchange_rates_list(
     Redirects to the exchange rate API.
     """
     return await service.return_rates_list()
+
+
+@router.get(
+    '/dummy'
+)
+async def dummy():
+    """
+    Dummy route for testing purposes.
+
+    Is used as a benchmark for the load testing.
+    """
+    return 'dummy'
