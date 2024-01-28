@@ -41,6 +41,6 @@ async def get_exchange_rates_list(
     service: ExchangeRatesService = Depends(main_service_injector),
 ):
     """
-    Redirects to the exchange rate API
+    Redirects to the exchange rate API.
     """
     return await service.return_rates_list()
