@@ -15,5 +15,19 @@ The FastAPI process is responsible for handling the users requests.
 
 
 ## How to run
-- Build the docker image
-- Run the docker image 
+Clone the repository.
+
+Enter the project directory.
+```sh
+cd web_cur
+```
+
+Run the following command:
+```sh
+sudo docker-compose -f .prodcontainer/docker-compose.yaml build --no-cache
+```
+
+After the build is complete, run the following command:
+```sh
+sudo docker-compose -f .prodcontainer/docker-compose.yaml up
+```
