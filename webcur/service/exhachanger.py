@@ -48,8 +48,8 @@ class ExchangeRatesService():
         without removing it.
         """
         try:
-            front_element = self.data_queue.get_nowait()
-            self.data_queue.put_nowait(front_element)
+            front_element = self.data_queue.get()
+            self.data_queue.put(front_element)
             return front_element
         except Exception:
             # TODO: Add different exceptions

@@ -62,4 +62,6 @@ if __name__ == '__main__':
         target=background_process,
         args=(data_queue,)
     ).start()
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    config = uvicorn.Config(app, host="0.0.0.0", port=8000, workers=4)
+    server = uvicorn.Server(config)
+    server.run()
