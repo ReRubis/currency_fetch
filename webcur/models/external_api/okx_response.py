@@ -20,9 +20,18 @@ class WSDataResponse(BaseModel):
     ts: str
 
 
-class WSCurRateResponse(BaseModel):
+class OKXCurRateResponse(BaseModel):
     """
     A model for the subscribe message
     """
     arg: WSArgResponse
-    data: list[dict]
+    data: list[WSDataResponse]
+
+
+class OKXSubscribeResponse(BaseModel):
+    """
+    A model for the subscribe message
+    """
+    event: str
+    arg: WSArgResponse
+    connId: str

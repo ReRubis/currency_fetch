@@ -2,8 +2,8 @@ from webcur.service.external_api.baseapi import BaseAPI
 from webcur.config import CONFIG
 import websockets
 import asyncio
-import json
 import time
+from pydantic import TypeAdapter
 
 from webcur.models.external_api.okx_request import (
     SubscribeMessage,
@@ -11,7 +11,11 @@ from webcur.models.external_api.okx_request import (
 )
 
 from webcur.models.external_api.okx_common import InstId
-from typing import Iterable
+from webcur.models.external_api.okx_response import (
+    OKXCurRateResponse,
+    OKXSubscribeResponse
+)
+from typing import Iterable, Union
 from websockets import WebSocketClientProtocol
 from multiprocessing import Queue
 import logging
@@ -19,8 +23,9 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# TODO: Add Pydantic model for the WS response
-# That will remove the hard-coded strings
+
+ws_response_adapter = TypeAdapter(
+    Union[OKXCurRateResponse, OKXSubscribeResponse])
 
 
 class OKXIntegration(BaseAPI):
@@ -73,13 +78,15 @@ class OKXIntegration(BaseAPI):
         while True:
             try:
                 response = await websocket.recv()
-                data = json.loads(response)
-                if data.get('event') == 'subscribe':
-                    logger.info(f"Subscribed to {data['arg']['instId']}")
 
-                elif data.get('data'):
+                data = ws_response_adapter.validate_json(response)
+
+                if isinstance(data, OKXSubscribeResponse):
+                    logger.info(f"Subscribed to {data.arg.instId}")
+
+                elif isinstance(data, OKXCurRateResponse):
                     logger.info('Received Currency exchange rate' +
-                                f' for {data["data"][0]["instId"]}')
+                                f' for {data.data[0].instId}')
                     await self._update_stored_values(data=data)
 
                 time.sleep(5)
@@ -101,17 +108,14 @@ class OKXIntegration(BaseAPI):
             logger.debug('Setting the initial state of the queue')
             self.queue.put(data)
 
-    async def _update_stored_values(self, data: dict) -> None:
+    async def _update_stored_values(self, data: OKXCurRateResponse) -> None:
         """
         Method that updates the stored values
         """
 
-        # Short from input_currency
-        # TODO: Change the variable name and remove strings
-        ic = data['data'][0]
-
+        ic = data.data[0]
         stored_data = self.queue.get()
-        stored_data[ic['instId']] = ic
+        stored_data[ic.instId] = ic
         logger.debug('Updating the stored data')
         self.queue.put(stored_data)
 
