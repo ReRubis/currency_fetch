@@ -1,42 +1,44 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from webcur.service.external_api.baseapi import BaseAPI
 from webcur.routes import route
-from webcur.service.external_api.OKXintegration import OKXIntegration
 import uvicorn
-from webcur.config import CONFIG
-import multiprocessing
 import asyncio
-from webcur.service.injectors import data_queue_injector
+from webcur.config import CONFIG
+from webcur.service.injectors import okx_integration_injector
+from contextlib import asynccontextmanager
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def background_process(
-    data_queue: multiprocessing.Queue
-):
-    """
-    Background process that fetches the data from API and saves it database
-    """
-    async def run():
-        api = [
-            # BinanceIntegration(),
-            OKXIntegration(data_queue)
-        ]
-        for api in api:
-            logger.info(f'Starting {api.__class__.__name__}')
-            await api.run_websocket(
-                pair_name=CONFIG['CURRENCY_PAIRS']
-            )
+@asynccontextmanager
+async def background_process(app: FastAPI):
+    """Background process for the FastAPI app
 
-    asyncio.run(run())
+    Starts the websocket connection on FastAPI startup
+    """
+    api = [
+        okx_integration_injector()
+    ]
+
+    async def run_websocket(api: BaseAPI):
+        await api.run_websocket(
+            pair_name=CONFIG['CURRENCY_PAIRS']
+        )
+
+    for api in api:
+        logger.info(f'Starting {api.__class__.__name__}')
+        asyncio.create_task(run_websocket(api))
+
+    yield
 
 
 def app_factory():
     """
     Builds the FastAPI app
     """
-    app = FastAPI()
+    app = FastAPI(lifespan=background_process)
 
     origins = [
         "*",
@@ -55,13 +57,8 @@ def app_factory():
 
 
 if __name__ == '__main__':
-    data_queue = data_queue_injector()
     app = app_factory()
 
-    multiprocessing.Process(
-        target=background_process,
-        args=(data_queue,)
-    ).start()
     config = uvicorn.Config(app, host="0.0.0.0", port=8000, workers=4)
     server = uvicorn.Server(config)
     server.run()

@@ -1,66 +1,21 @@
 from webcur.service.exhachanger import ExchangeRatesService
-from functools import wraps
-from cachetools import TTLCache
-import multiprocessing
+from webcur.service.external_api.OKXintegration import OKXIntegration
 
-# TODO: Move queue logic out of the injectors
-# Possibly create a queue logic class
-data_queue = multiprocessing.Queue()
+okx_integration = OKXIntegration()
 
 
-def timed_lru_cache(seconds):
+def okx_integration_injector():
     """
-    Timed LRU cache decorator
+    Returns the OKX integration.
     """
-    def decorator(func):
-        cache = TTLCache(maxsize=1, ttl=seconds)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            key = (args, frozenset(kwargs.items()))
-            if key in cache:
-                result = cache[key]
-            else:
-                result = func(*args, **kwargs)
-                cache[key] = result
-            return result
-
-        return wrapper
-
-    return decorator
-
-
-def data_queue_injector():
-    """
-    Returns the data queue.
-    """
-    return data_queue
-
-
-def data_queue_value_injector():
-    """
-    Returns the data queue value.
-    """
-    return _get_queue_value()
+    return okx_integration
 
 
 def main_service_injector():
     """
     Returns the main service.
     """
-    data_queue_value = data_queue_value_injector()
-    return ExchangeRatesService(data_queue_value)
-
-
-@timed_lru_cache(5)
-def _get_queue_value():
-    """
-    Returns the data queue value.
-    """
-    try:
-        front_element = data_queue.get()
-        data_queue.put(front_element)
-        return front_element
-    except Exception:
-        # TODO: Add different exceptions
-        return None
+    integrations = [
+        okx_integration_injector()
+    ]
+    return ExchangeRatesService(integrations)

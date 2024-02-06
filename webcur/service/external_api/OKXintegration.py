@@ -2,7 +2,6 @@ from webcur.service.external_api.baseapi import BaseAPI
 from webcur.config import CONFIG
 import websockets
 import asyncio
-import time
 from pydantic import TypeAdapter
 
 from webcur.models.external_api.okx_request import (
@@ -17,7 +16,6 @@ from webcur.models.external_api.okx_response import (
 )
 from typing import Iterable, Union
 from websockets import WebSocketClientProtocol
-from multiprocessing import Queue
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,17 +30,17 @@ class OKXIntegration(BaseAPI):
     """
     Class that makes call to the OKX API to get the exchange rates
 
-    Args:
-        data_queue (Queue): The queue to store the data
     """
 
-    def __init__(self, data_queue: Queue):
+    def __init__(self):
         self.api_key = CONFIG['OKX_API_KEY']
         self.api_secret = CONFIG['OKX_SECRET']
         self.base_uri = CONFIG['OKX_BASE_PUBLIC_URL']
-        self.queue = data_queue
-
-        self._set_queue()
+        self.data = {
+            'BTC-USDT': None,
+            'ETH-USDT': None,
+            'XRP-USDT': None,
+        }
 
     async def run_websocket(
             self,
@@ -89,40 +87,35 @@ class OKXIntegration(BaseAPI):
                                 f' for {data.data[0].instId}')
                     await self._update_stored_values(data=data)
 
-                time.sleep(5)
+                await asyncio.sleep(5)
 
             except websockets.ConnectionClosed:
                 logger.info("Connection closed. Reconnecting...")
                 break
 
-    def _set_queue(self) -> None:
-        """
-        Sets the initial state of the queue
-        """
-        if self.queue.empty():
-            data = {
-                'BTC-USDT': None,
-                'ETH-USDT': None,
-                'XRP-USDT': None,
-            }
-            logger.debug('Setting the initial state of the queue')
-            self.queue.put(data)
-
     async def _update_stored_values(self, data: OKXCurRateResponse) -> None:
         """
         Method that updates the stored values
         """
-
         ic = data.data[0]
-        stored_data = self.queue.get()
-        stored_data[ic.instId] = ic
+        self.data[ic.instId] = ic
         logger.debug('Updating the stored data')
-        self.queue.put(stored_data)
+
+    async def get_exchange_rates(self, pair_name: str) -> OKXCurRateResponse:
+        """
+        Method that returns the exchange rate
+        """
+        return self.data[pair_name]
+
+    async def return_rates(self) -> dict:
+        """
+        Method that returns the exchange rates
+        """
+        return self.data
 
 
 if __name__ == '__main__':
-    data_queue = Queue()
-    service = OKXIntegration(data_queue)
+    service = OKXIntegration()
 
     async def test_ws():
         await service.run_websocket(

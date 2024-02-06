@@ -1,4 +1,4 @@
-from webcur.database.repository import DataBaseRepository
+from webcur.service.external_api.baseapi import BaseAPI
 
 
 class ExchangeRatesService():
@@ -14,18 +14,16 @@ class ExchangeRatesService():
 
     def __init__(
         self,
-        data_queue_value: dict,
-        repository: DataBaseRepository | None = None,
+        integrations: list[BaseAPI],
     ):
-        self.data_queue = data_queue_value
-        self.repository = repository
+        self.integrations = integrations
 
     async def return_rates_list(self) -> dict:
         """
         Returns all rates in the database
         """
 
-        return {'data': self.data_queue}
+        return {'data': await self.integrations[0].return_rates()}
 
     async def return_rate(self, pair_name) -> dict:
         """
@@ -34,17 +32,4 @@ class ExchangeRatesService():
         Args:
             pair_name (str): The pair to get the exchange rate for
         """
-        return self.data_queue[pair_name]
-
-    # def _peek(self):
-    #     """
-    #     Peeks at the front element of the multiprocessing.Queue
-    #     without removing it.
-    #     """
-    #     try:
-    #         front_element = self.data_queue.get()
-    #         self.data_queue.put(front_element)
-    #         return front_element
-    #     except Exception:
-    #         # TODO: Add different exceptions
-    #         return None
+        return await self.integrations[0].get_exchange_rates(pair_name)
